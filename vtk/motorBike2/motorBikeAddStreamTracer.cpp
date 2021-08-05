@@ -23,6 +23,10 @@
 #include <vtkPolyDataWriter.h>
 #include <vtkLineSource.h>
 #include <vtkCellDataToPointData.h>
+#include <vtkTubeFilter.h>
+#include <vtkNamedColors.h>
+#include <vtkCellData.h>
+#include <vtkLookupTable.h>
 
 #define FILE_PATH "/Users/austsxk/github_sxk_repo/c++/cpp/vtk/motorBike/motorbike.vtk"
 // 流线处理
@@ -95,6 +99,13 @@ int main() {
     lineTracer->SetComputeVorticity(1);
     lineTracer->Update();
 
+    // 创建管线
+    vtkNew<vtkTubeFilter> tube;
+    tube->SetInputConnection(lineTracer->GetOutputPort());
+    tube->SetRadius(0.02);
+    tube->SetNumberOfSides(10);
+    tube->Update();
+
     // 将流线数据导出
     vtkNew<vtkPolyDataWriter> w;
     w->SetInputConnection(lineTracer->GetOutputPort());
@@ -102,13 +113,29 @@ int main() {
     w->Update();
     w->Write();
 
+    // 定义颜色查找表
+    vtkNew<vtkLookupTable> lookup;
+    lookup->Build();
+    lookup->SetHueRange(0.667, 0);
+
+
+    // 获取模型中值的范围
+    auto modelPRange = reader->GetOutput()->GetCellData()->GetVectors("p");
+    double mmr[2] = {0};
+    modelPRange->GetRange(mmr, -1);
+
     // 将数据转化为图元进行渲染
     vtkNew<vtkPolyDataMapper> mapper;
     mapper->SetInputData(geo->GetOutput());
+    // 使用之前提到得自定义颜色渲染使用的量,使用场数据
+    mapper->SetScalarModeToUseFieldData();
+    mapper->ColorByArrayComponent("p", 0);
+    mapper->SetScalarRange(mmr[0], mmr[1]);
+    mapper->SetLookupTable(lookup);
     mapper->Update();
 
     vtkNew<vtkPolyDataMapper> tracerMapper;
-    tracerMapper->SetInputConnection(lineTracer->GetOutputPort());
+    tracerMapper->SetInputConnection(tube->GetOutputPort());
     tracerMapper->Update();
 
 
